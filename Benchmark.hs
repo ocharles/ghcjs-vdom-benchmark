@@ -6,12 +6,10 @@ import Prelude hiding (div)
 import Data.Function
 import Control.Applicative
 import Data.List
-import Bootstrap
 import System.Locale
 import GHCJS.Foreign
 import Data.Text (Text)
 import Data.Time
-import Control.Lens
 import qualified Data.Text as T
 import HTML hiding (b)
 
@@ -49,21 +47,21 @@ main = do
 mkUI :: [Class] -> HTML
 mkUI schedule =
   div </> [
-   div & classes .~ ["schedules"] </> [
+   div </> [
     case schedule of
       [] -> emptySchedule
-      _ -> div & classes .~ ["classes"] </>
+      _ -> div </>
            (dayRow <$> groupBy ((==) `on` (utctDay . classStartTime)) schedule)]]
 
   where
   emptySchedule =
-    div & classes .~ ["no-events"] </> [
+    div </> [
      "There are no events here right now."]
 
   dayRow day =
     let dayHeader =
           row </> [
-           div & classes .~ ["date-header"] </> [
+           div </> [
              text (toJSString $ T.pack (formatTime defaultTimeLocale "%A %e %B" (classStartTime (Prelude.head day))))]]
 
         clickableClassRow c =
@@ -73,19 +71,19 @@ mkUI schedule =
 classRow :: Class -> HTML
 classRow c =
   let rowCell cellClass t =
-        div & classes .~ [cellClass] </> [text t]
-  in div & classes .~ ["class"] </> [
-      container & classes <>~ ["time"] </> [
+        div </> [text t]
+  in div </> [
+      container </> [
        row </> [
         rowCell "start-time" (toJSString $ T.pack (formatTime defaultTimeLocale "%H:%M" (classStartTime c))),
         rowCell "duration" (toJSString $ T.pack (show (classDuration c)))]],
-      container & classes <>~ ["details"] </> [
+      container </> [
        row </> [
         rowCell "type" (toJSString $ classTypeName (classType c)),
-        div & classes .~ ["business"] </> [ showBusiness (classBusiness c) ]]]]
+        div </> [ showBusiness (classBusiness c) ]]]]
 
   where
   showBusiness b =
     maybe (text (toJSString $ businessName b))
-          (\pic -> img & attrs . at "src" ?~ toJSString pic)
+          (\pic -> img)
           (businessPicture b)

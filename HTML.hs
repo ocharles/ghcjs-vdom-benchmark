@@ -1,23 +1,9 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
-module HTML
-  ( html, head, title, base, link, meta, style, script, noscript, body, section, nav, article, aside, h1, h2, h3, h4, h5, h6, hgroup, header, footer, address, p, hr, pre, blockquote, ol, ul, li, dl, dt, dd, figure, figcaption, div, a, em, strong, small, s, cite, q, dfn, abbr, data_, time, code, var, samp, kbd, sub, sup, i, b, u, mark, ruby, rt, rp, bdi, bdo, span, br, wbr, ins, del, img, iframe, embed, object, param, video, audio, source, track, canvas, map, area, table, caption, colgroup, col, tbody, thead, tfoot, tr, td, th, form, fieldset, legend, label, input, button, select, datalist, optgroup, option, textarea, keygen, output, progress, meter, details, summary, command, menu, dialog
+module HTML where
 
-  , HTML
-  , (</>)
-  , attrs
-  , classes
-  , text
-
-  , EventHandlers(..)
-  , events
-  , onClick
-  , renderTo
-  , newTopLevelContainer
-  , noEvents
-  )
-where
-
+import Unsafe.Coerce
+import qualified Immutable
 import Prelude hiding (div, head, map, mapM, sequence, span)
 import Data.String (IsString(..))
 import Data.HashMap.Strict (HashMap, traverseWithKey)
@@ -40,9 +26,6 @@ import Reactive.Banana.Frameworks
 import qualified Data.Text as T
 import System.IO.Unsafe
 import GHCJS.Marshal
-import Immutable
-
-import HTML2
 
 html, head, title, base, link, meta, style, script, noscript, body, section, nav, article, aside, h1, h2, h3, h4, h5, h6, hgroup, header, footer, address, p, hr, pre, blockquote, ol, ul, li, dl, dt, dd, figure, figcaption, div, a, em, strong, small, s, cite, q, dfn, abbr, data_, time, code, var, samp, kbd, sub, sup, i, b, u, mark, ruby, rt, rp, bdi, bdo, span, br, wbr, ins, del, img, iframe, embed, object, param, video, audio, source, track, canvas, map, area, table, caption, colgroup, col, tbody, thead, tfoot, tr, td, th, form, fieldset, legend, label, input, button, select, datalist, optgroup, option, textarea, keygen, output, progress, meter, details, summary, command, menu, dialog :: HTML
 
@@ -157,26 +140,6 @@ command = emptyElement "command"
 menu = emptyElement "menu"
 dialog = emptyElement "dialog"
 
-
-
-data EventHandlers = EventHandlers
-  { ehClick :: Maybe (Handler ())}
-
-noEvents :: EventHandlers
-noEvents = EventHandlers Nothing
-
-events :: Traversal' HTML EventHandlers
-events f n = pure n
--- events f (Element t attrs_ handlers c) = Element <$> pure t <*> pure attrs_ <*> f handlers <*> pure c
--- events _ e = pure e
-
-onClick' :: Traversal' EventHandlers (Maybe (Handler ()))
-onClick' f (EventHandlers x) = EventHandlers <$> f x
-
-onClick :: Traversal' HTML (Maybe (Handler ()))
-onClick = events . onClick'
-
---------------------------------------------------------------------------------
 foreign import javascript unsafe
   "console.time($1)" timeStart :: JSString -> IO ()
 
@@ -186,7 +149,6 @@ foreign import javascript unsafe
 timing :: (Applicative m, MonadIO m) => JSString -> m a -> m a
 timing lbl m = liftIO (timeStart lbl) *> m <* liftIO (timeEnd lbl)
 
---------------------------------------------------------------------------------
 foreign import javascript unsafe
   "vdom($1)"
   createElement :: HTML -> IO Element
@@ -226,3 +188,44 @@ newTopLevelContainer = do
   Just bodyNode <- documentGetBody doc
   _ <- nodeAppendChild bodyNode (Just el)
   return (VNodePresentation currentVNode el)
+
+
+data VNode
+
+newtype HTML = HTML (JSRef VNode)
+
+foreign import javascript safe
+  "console.time('new VText'); $r = new VText($1); console.timeEnd('new VText');" text :: JSString -> HTML
+
+foreign import javascript safe
+  "new VNode($1)" emptyElement :: JSString -> HTML
+
+foreign import javascript safe
+  "$1 && $1.type == 'VirtualNode'" isVNode :: HTML -> JSBool
+
+foreign import javascript safe
+  "console.time('setVNodeChildren'); if ($1.type == 'VirtualNode') { $r = new VNode($1.tagName, $1.properties, $2); } else { $r = $1; } console.timeEnd('setVNodeChildren')" setVNodeChildren :: HTML -> JSArray a -> HTML
+
+infixl 1 </>
+(</>) :: HTML -> [HTML] -> HTML
+n </> xs = setVNodeChildren n (unsafePerformIO (toArray (unsafeCoerce xs)))
+
+instance IsString HTML where
+  fromString = text . toJSString
+
+foreign import javascript safe
+  "console.time('vNodeGetAttributes'); $r = Immutable.Map($1.properties.attributes); console.timeEnd('vNodeGetAttributes');"
+  vNodeGetAttributes :: HTML -> Immutable.Map
+
+foreign import javascript safe
+  "console.time('vNodeSetAttributes'); $r = new VNode($1.tagName, {'attributes': $2.toJS()}, $1.children); console.timeEnd('vNodeSetAttributes');"
+  vNodeSetAttributes :: HTML -> Immutable.Map -> HTML
+
+row :: HTML
+row = div
+
+containerFluid :: HTML
+containerFluid = div
+
+container :: HTML
+container = div
